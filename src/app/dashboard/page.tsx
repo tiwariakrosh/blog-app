@@ -1,159 +1,175 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useAuth } from "@/hooks/use-auth";
+import { useState, useEffect } from "react";
+import Link from "next/link";
 import { ProtectedRoute } from "@/components/protected-route";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { LoadingSpinner } from "@/components/ui/loader";
-import Link from "next/link";
-import { Navbar } from "@/components/navbar";
-import { usePosts } from "@/store/post-store";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { usePosts } from "@/hooks/use-posts";
+import { useDebounce } from "@/hooks/use-debounce";
+import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
+import { toast } from "sonner";
+import { Plus, Loader2, Search, Filter } from "lucide-react";
+import { BlogCard } from "@/components/blog-card";
 
 export default function DashboardPage() {
-  const { posts, isLoading, error, fetchPosts, deletePost } = usePosts();
-  const { user } = useAuth();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("");
+  const {
+    posts,
+    isLoading,
+    isLoadingMore,
+    error,
+    hasMore,
+    sortBy,
+    setSearchQuery,
+    setSortBy,
+    loadMore,
+    searchQuery,
+    deletePost,
+  } = usePosts();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [localSearchQuery, setLocalSearchQuery] = useState("");
+  const debouncedSearch = useDebounce(localSearchQuery, 300);
+
+  const sentinelRef = useInfiniteScroll({
+    onLoadMore: loadMore,
+    hasMore,
+    isLoading: isLoadingMore,
+  });
 
   useEffect(() => {
-    fetchPosts();
-  }, []);
+    setSearchQuery(debouncedSearch);
+  }, [debouncedSearch, setSearchQuery]);
 
-  const categories = [...new Set(posts.map((p) => p.category))];
-  const filteredPosts = posts.filter(
-    (post) =>
-      (post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        post.excerpt.toLowerCase().includes(searchTerm.toLowerCase())) &&
-      (!selectedCategory || post.category === selectedCategory)
-  );
+  const handleDelete = async (id: string, title: string) => {
+    if (!confirm(`Are you sure you want to delete "${title}"?`)) return;
 
-  const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete this post?")) {
+    setDeletingId(id);
+    try {
       await deletePost(id);
+      toast.success("Post deleted successfully");
+    } catch (error) {
+      toast.error("Failed to delete post");
+    } finally {
+      setDeletingId(null);
     }
   };
 
   return (
     <ProtectedRoute>
-      <main className="max-w-7xl bg-background mx-auto px-4 w-full h-full py-8">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">
-              Blog Dashboard
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Welcome back, {user?.name}!
-            </p>
-          </div>
-          <Link href="/dashboard/create">
-            <Button variant="primary">Write New Post</Button>
-          </Link>
-        </div>
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-8">
+          <div className="mb-8">
+            <div className="flex items-center flex-col md:flex-row gap-4 justify-between mb-6">
+              <div>
+                <h1 className="text-4xl font-bold mb-2">My Blog Posts</h1>
+                <p className="text-muted-foreground">
+                  Manage your content • {posts.length} posts
+                </p>
+              </div>
+              <Link href="/dashboard/create">
+                <Button size="md" icon={<Plus className="h-5 w-5" />}>
+                  Create Post
+                </Button>
+              </Link>
+            </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="md:col-span-3">
-            <input
-              type="text"
-              placeholder="Search posts..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-2 border-2 border-input bg-background text-foreground rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary placeholder:text-muted-foreground"
-            />
-          </div>
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="w-full px-4 py-2 border-2 border-input bg-background text-foreground rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
-          >
-            <option value="">All Categories</option>
-            {categories.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </select>
-        </div>
-        {/* 
-        {error && (
-          <Alert variant="destructive" className="mb-6">
-            {error}
-          </Alert>
-        )} */}
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search posts by title or content..."
+                  value={localSearchQuery}
+                  onChange={(e) => setLocalSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
 
-        {isLoading ? (
-          <LoadingSpinner message="Loading posts..." />
-        ) : filteredPosts.length === 0 ? (
-          <Card>
-            <CardContent className="py-12">
-              <p className="text-center text-muted-foreground">
-                {posts.length === 0
-                  ? "No posts yet. Start writing!"
-                  : "No posts match your search."}
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4">
-            {filteredPosts.map((post) => (
-              <Card
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <select
+                  value={sortBy}
+                  onChange={(e) =>
+                    setSortBy(e.target.value as "newest" | "oldest" | "title")
+                  }
+                  className="h-10 px-3 rounded-md border border-input bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <option value="newest">Newest First</option>
+                  <option value="oldest">Oldest First</option>
+                  <option value="title">Title (A-Z)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {isLoading && (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <span className="ml-3 text-muted-foreground">
+                Loading posts...
+              </span>
+            </div>
+          )}
+
+          {error && (
+            <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded-lg">
+              {error}
+            </div>
+          )}
+
+          {!isLoading && !error && posts.length === 0 && (
+            <Card className="text-center py-12">
+              <CardContent>
+                <p className="text-muted-foreground mb-4">
+                  {searchQuery
+                    ? "No posts match your search."
+                    : "No posts yet. Create your first post!"}
+                </p>
+                <Link href="/dashboard/create">
+                  <Button
+                    size="md"
+                    variant="primary"
+                    icon={<Plus className="h-4 w-4" />}
+                  >
+                    Create Post
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {posts.map((post) => (
+              <BlogCard
                 key={post.id}
-                className="hover:border-primary/50 transition-colors"
-              >
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="text-xl">{post.title}</CardTitle>
-                      <CardDescription>{post.excerpt}</CardDescription>
-                    </div>
-                    <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
-                      {post.category}
-                    </span>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {post.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded"
-                      >
-                        #{tag}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(post.createdAt).toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </p>
-                    <div className="flex gap-2">
-                      <Link href={`/dashboard/edit/${post.id}`}>
-                        <Button variant="primary">Edit</Button>
-                      </Link>
-                      <Button
-                        variant="danger"
-                        onClick={() => handleDelete(post.id)}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                post={post}
+                onDelete={handleDelete}
+                isDeleting={deletingId === post.id}
+              />
             ))}
           </div>
-        )}
-      </main>
+
+          {isLoadingMore && (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <span className="ml-2 text-muted-foreground">
+                Loading more...
+              </span>
+            </div>
+          )}
+
+          {hasMore && !isLoadingMore && (
+            <div ref={sentinelRef} className="h-4" />
+          )}
+
+          {!hasMore && posts.length > 0 && (
+            <p className="text-center text-sm text-muted-foreground py-8">
+              No more posts to load
+            </p>
+          )}
+        </div>
+      </div>
     </ProtectedRoute>
   );
 }

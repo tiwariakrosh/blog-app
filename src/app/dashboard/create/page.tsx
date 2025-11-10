@@ -1,23 +1,21 @@
 "use client";
 
-import type React from "react";
-
-import { useState } from "react";
+import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/hooks/use-auth";
+import { toast } from "sonner";
 import { ProtectedRoute } from "@/components/protected-route";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { TiptapEditor } from "@/components/tiptap-editor";
-import { usePosts } from "@/store/post-store";
+import { usePosts } from "@/hooks/use-posts";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function CreatePostPage() {
   const router = useRouter();
-  const { createPost, isLoading } = usePosts();
+  const { createPost, isLoading: storeLoading } = usePosts();
   const { user } = useAuth();
-  const [error, setError] = useState("");
 
   const [formData, setFormData] = useState({
     title: "",
@@ -26,6 +24,15 @@ export default function CreatePostPage() {
     category: "",
     tags: "",
   });
+
+  const [errors, setErrors] = useState({
+    title: "",
+    excerpt: "",
+    content: "",
+    category: "",
+  });
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const categories = ["Tutorial", "News", "Tips", "Review", "Other"];
 
@@ -36,42 +43,57 @@ export default function CreatePostPage() {
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    setError("");
+    if (errors[name as keyof typeof errors]) {
+      setErrors((prev) => ({ ...prev, [name]: "" }));
+    }
   };
 
   const handleContentChange = (content: string) => {
     setFormData((prev) => ({ ...prev, content }));
+    if (errors.content) setErrors((prev) => ({ ...prev, content: "" }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
+  const validateForm = () => {
+    const newErrors = { title: "", excerpt: "", content: "", category: "" };
+    let isValid = true;
 
     if (!formData.title.trim()) {
-      setError("Title is required");
-      return;
+      newErrors.title = "Title is required";
+      isValid = false;
     }
 
     if (!formData.excerpt.trim()) {
-      setError("Excerpt is required");
-      return;
+      newErrors.excerpt = "Excerpt is required";
+      isValid = false;
     }
 
     if (!formData.content.trim()) {
-      setError("Content is required");
-      return;
+      newErrors.content = "Content is required";
+      isValid = false;
     }
 
     if (!formData.category) {
-      setError("Category is required");
-      return;
+      newErrors.category = "Category is required";
+      isValid = false;
     }
+
+    setErrors(newErrors);
+    return isValid;
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
+    const toastId = toast.loading("Creating post...");
 
     try {
       const tags = formData.tags
         .split(",")
         .map((t) => t.trim())
-        .filter((t) => t);
+        .filter(Boolean);
 
       await createPost({
         title: formData.title,
@@ -83,11 +105,18 @@ export default function CreatePostPage() {
         authorId: user?.id || "",
       });
 
+      toast.success("Post created successfully!", { id: toastId });
       router.push("/dashboard");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create post");
+      const message =
+        err instanceof Error ? err.message : "Failed to create post";
+      toast.error(message, { id: toastId });
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
+  const isLoading = storeLoading || isSubmitting;
 
   return (
     <ProtectedRoute>
@@ -101,12 +130,6 @@ export default function CreatePostPage() {
           </p>
         </div>
 
-        {/* {error && (
-          <Alert variant="destructive" className="mb-6">
-            {error}
-          </Alert>
-        )} */}
-
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
@@ -115,6 +138,7 @@ export default function CreatePostPage() {
               value={formData.title}
               onChange={handleChange}
               placeholder="Enter post title"
+              error={errors.title}
               disabled={isLoading}
             />
             <Select
@@ -123,6 +147,7 @@ export default function CreatePostPage() {
               value={formData.category}
               onChange={handleChange}
               options={categories.map((cat) => ({ value: cat, label: cat }))}
+              error={errors.category}
               disabled={isLoading}
             />
           </div>
@@ -133,6 +158,7 @@ export default function CreatePostPage() {
             value={formData.excerpt}
             onChange={handleChange}
             placeholder="Brief summary of your post"
+            error={errors.excerpt}
             disabled={isLoading}
             rows={3}
           />
@@ -156,18 +182,21 @@ export default function CreatePostPage() {
               placeholder="Start writing your post..."
               readOnly={isLoading}
             />
+            {errors.content && (
+              <p className="text-sm text-destructive mt-1">{errors.content}</p>
+            )}
           </div>
 
           <div className="flex gap-4 justify-end">
             <Button
               type="button"
-              variant="secondary"
+              variant="outline"
               onClick={() => router.back()}
               disabled={isLoading}
             >
               Cancel
             </Button>
-            <Button type="submit" variant="primary" isLoading={isLoading}>
+            <Button variant="primary" type="submit" isLoading={isLoading}>
               Publish Post
             </Button>
           </div>

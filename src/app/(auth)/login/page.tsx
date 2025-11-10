@@ -4,7 +4,6 @@ import { useState, FormEvent } from "react";
 import { toast } from "sonner";
 import { PenSquare } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -50,11 +49,13 @@ const Login = () => {
 
     setIsLoading(true);
     try {
-      login(email, password);
+      await login(email, password);
       toast.success("Login successful!");
       router.push("/dashboard");
-    } catch (error) {
-      toast.error("Login failed. Please check your credentials.");
+    } catch (error: any) {
+      const message =
+        error.message || "Login failed. Please check your credentials.";
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -62,10 +63,6 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <div className="absolute top-4 right-4">
-        <ThemeToggle />
-      </div>
-
       <div className="flex-1 flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
@@ -74,7 +71,7 @@ const Login = () => {
             </div>
             <h1 className="text-3xl font-bold mb-2">Welcome Back</h1>
             <p className="text-muted-foreground">
-              Sign in to continue to BlogSpace
+              Sign in to continue to Blog App.
             </p>
           </div>
 

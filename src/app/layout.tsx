@@ -1,22 +1,14 @@
-"use client";
-
 import type React from "react";
-// import type { Metadata } from "next";
+import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/lib/theme";
 import { Navbar } from "@/components/navbar";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { useAuth } from "@/hooks/use-auth";
+import { Toaster } from "sonner";
 
-// export const metadata: Metadata = {
-//   title: "Blog Platform - Create & Share Stories",
-//   description: "A modern blog platform built with Next.js, Zustand, and Tiptap",
-// };
-
-function AuthInitializer() {
-  useAuth();
-  return null;
-}
+export const metadata: Metadata = {
+  title: "Blog Platform - Create & Share Stories",
+  description: "A modern blog platform built with Next.js, Zustand, and Tiptap",
+};
 
 export default function RootLayout({
   children,
@@ -27,13 +19,17 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body>
         <div className="min-h-screen bg-background">
-          <AuthInitializer />
           <ThemeProvider>
             <Navbar />
             <main>{children}</main>
-            <div className="fixed bottom-4 right-4">
-              <ThemeToggle />
-            </div>
+            <Toaster
+              position="top-center"
+              richColors
+              closeButton
+              toastOptions={{
+                duration: 4000,
+              }}
+            />
           </ThemeProvider>
         </div>
       </body>

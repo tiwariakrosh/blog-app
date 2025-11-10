@@ -1,155 +1,178 @@
 "use client";
 
-import type React from "react";
-
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/hooks/use-auth";
-import { Button } from "@/components/ui/button";
+import { useState, FormEvent } from "react";
+import { toast } from "sonner";
+import { PenSquare } from "lucide-react";
+import { useAuthStore } from "@/store/auth-store";
 import { Input } from "@/components/ui/input";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Alert } from "@/components/ui/alert";
+import { useRouter } from "next/navigation";
 
-export default function RegisterPage() {
+const Register = () => {
   const router = useRouter();
-  const { register, isLoading, isAuthenticated } = useAuth();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
     confirmPassword: "",
   });
-  const [validationError, setValidationError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState({
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
 
-  if (isAuthenticated) {
-    router.push("/dashboard");
-    return null;
-  }
+  const register = useAuthStore((state) => state.register);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    setValidationError("");
+  const validateForm = () => {
+    const newErrors = {
+      name: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+    };
+    let isValid = true;
+
+    if (!formData.name.trim()) {
+      newErrors.name = "Full name is required";
+      isValid = false;
+    }
+
+    if (!formData.email) {
+      newErrors.email = "Email is required";
+      isValid = false;
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = "Email is invalid";
+      isValid = false;
+    }
+
+    if (!formData.password) {
+      newErrors.password = "Password is required";
+      isValid = false;
+    } else if (formData.password.length < 6) {
+      newErrors.password = "Password must be at least 6 characters";
+      isValid = false;
+    }
+
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = "Please confirm your password";
+      isValid = false;
+    } else if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = "Passwords do not match";
+      isValid = false;
+    }
+
+    setErrors(newErrors);
+    return isValid;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleChange =
+    (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
+      setFormData((prev) => ({ ...prev, [field]: e.target.value }));
+      if (errors[field as keyof typeof errors]) {
+        setErrors((prev) => ({ ...prev, [field]: "" }));
+      }
+    };
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setValidationError("");
 
-    if (
-      !formData.name ||
-      !formData.email ||
-      !formData.password ||
-      !formData.confirmPassword
-    ) {
-      setValidationError("All fields are required");
-      return;
-    }
+    if (!validateForm()) return;
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      setValidationError("Please enter a valid email");
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      setValidationError("Password must be at least 6 characters");
-      return;
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      setValidationError("Passwords do not match");
-      return;
-    }
-
+    setIsLoading(true);
     try {
       await register(formData.email, formData.password, formData.name);
+      toast.success("Account created successfully!");
       router.push("/dashboard");
-    } catch (err) {
-      setValidationError("Registration failed. Please try again.");
+    } catch (error: any) {
+      const message =
+        error?.message || "Registration failed. Please try again.";
+      toast.error(message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Create Account</CardTitle>
-          <CardDescription>Join our blog community</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {validationError && (
-              <Alert variant="destructive">{validationError}</Alert>
-            )}
+    <div className="min-h-screen bg-background flex flex-col">
+      <div className="flex-1 flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="flex justify-center mb-4">
+              <PenSquare className="h-12 w-12 text-primary" />
+            </div>
+            <h1 className="text-3xl font-bold mb-2">Create Account</h1>
+            <p className="text-muted-foreground">
+              Join Blog App and start writing today
+            </p>
+          </div>
 
-            <Input
-              label="Full Name"
-              type="text"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              placeholder="John Doe"
-              disabled={isLoading}
-            />
+          <div className="bg-card border border-border rounded-lg p-8 shadow-sm">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <Input
+                label="Full Name"
+                type="text"
+                placeholder="John Doe"
+                value={formData.name}
+                onChange={handleChange("name")}
+                error={errors.name}
+                disabled={isLoading}
+              />
 
-            <Input
-              label="Email"
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="you@example.com"
-              disabled={isLoading}
-            />
+              <Input
+                label="Email"
+                type="email"
+                placeholder="you@example.com"
+                value={formData.email}
+                onChange={handleChange("email")}
+                error={errors.email}
+                disabled={isLoading}
+              />
 
-            <Input
-              label="Password"
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              placeholder="••••••••"
-              disabled={isLoading}
-            />
+              <Input
+                label="Password"
+                type="password"
+                placeholder="••••••••"
+                value={formData.password}
+                onChange={handleChange("password")}
+                error={errors.password}
+                disabled={isLoading}
+              />
 
-            <Input
-              label="Confirm Password"
-              type="password"
-              name="confirmPassword"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              placeholder="••••••••"
-              disabled={isLoading}
-            />
+              <Input
+                label="Confirm Password"
+                type="password"
+                placeholder="••••••••"
+                value={formData.confirmPassword}
+                onChange={handleChange("confirmPassword")}
+                error={errors.confirmPassword}
+                disabled={isLoading}
+              />
 
-            <Button
-              type="submit"
-              variant="primary"
-              isLoading={isLoading}
-              className="w-full"
-            >
-              Create Account
-            </Button>
-          </form>
+              <Button type="submit" className="w-full" isLoading={isLoading}>
+                Create Account
+              </Button>
+            </form>
 
-          <p className="text-center text-sm text-muted-foreground mt-4">
-            Already have an account?{" "}
-            <Link
-              href="/login"
-              className="text-primary hover:underline font-medium"
-            >
-              Sign in
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
+            <div className="mt-6 text-center">
+              <p className="text-sm text-muted-foreground">
+                Already have an account?{" "}
+                <Link
+                  href="/login"
+                  className="text-primary hover:underline font-medium"
+                >
+                  Sign in
+                </Link>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
-}
+};
+
+export default Register;

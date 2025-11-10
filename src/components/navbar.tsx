@@ -3,12 +3,11 @@
 import { useAuth } from "@/hooks/use-auth";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useThemeStore } from "@/store/theme-store";
 import { Button } from "./ui/button";
+import { ThemeToggle } from "./ui/theme-toggle";
 
 export const Navbar = () => {
   const { logout, user } = useAuth();
-  const { theme, toggleTheme } = useThemeStore();
   const router = useRouter();
 
   const handleLogout = () => {
@@ -29,21 +28,16 @@ export const Navbar = () => {
         <nav className="flex items-center gap-4">
           {user && (
             <span className="text-sm text-muted-foreground hidden sm:inline">
-              {user.name}
+              {user.name.toLocaleUpperCase()}
             </span>
           )}
 
-          <Button
-            variant="primary"
-            onClick={toggleTheme}
-            title={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
-          >
-            {theme === "light" ? "🌙" : "☀️"}
-          </Button>
-
-          <Button variant="secondary" onClick={handleLogout}>
-            Logout
-          </Button>
+          <ThemeToggle />
+          {user && (
+            <Button variant="danger" onClick={handleLogout}>
+              Logout
+            </Button>
+          )}
         </nav>
       </div>
     </header>

@@ -9,8 +9,6 @@ export default function HomePage() {
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAuth();
 
-  console.log("🚀 ~ HomePage ~ isAuthenticated:", isAuthenticated);
-
   useEffect(() => {
     if (!isLoading) {
       if (isAuthenticated) {
